@@ -18,5 +18,12 @@ make
 ### Bugs
 Might have a few memory leaks & bugs (which I will try to fix.)
 
+### Setup
+Requires password.h in src/include with content 
+```c
+static char* sysPass = "password";
+```
+This is unsafe but it is required for toggling VM
+
 ### TODO
 - Virtual Machine checker.
