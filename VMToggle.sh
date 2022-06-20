@@ -29,7 +29,7 @@ umount -fq /media/Storage
 umount -fq /dev/nvme0n1p3
 
 #start barrier if it isnt already started
-pgrep -x barrier > /dev/null
+pgrep -x barrier > /dev/null || barrier > /dev/null 2>&1 & disown
 
 virsh start $2
 #swap monitor input to displayport
