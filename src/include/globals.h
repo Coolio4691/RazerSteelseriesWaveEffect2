@@ -19,4 +19,9 @@ int lockShortcut[] = {
 
 int* lockShortcutPressed;
 
+
+static char* vmName = "win10"; 
+static int hasVM = 0;
+
+
 #endif

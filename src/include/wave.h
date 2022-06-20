@@ -115,13 +115,20 @@ void* wave(void* threadArgs) {
             for(int row = 0; row < keyboard.lighting.matrix.rows; row++) {
                 int idx = key_index_from_2D(&keyboard.lighting, col, row);
                 struct rgb keyRGB = rgb;
+                struct hsv keyHSV = hsv;
+
+                if(row == 0 && col == 16 && !hasVM) {
+                    keyHSV.hue = 1;
+                    keyHSV.value = 1.0;
+                    
+                    keyRGB = hsv_to_rgb(keyHSV); 
+                }
                 
                 if(pressedKeys[idx] > 0) {
-                    struct hsv keyHSV = hsv;
-
                     keyHSV.value -= (double)pressedKeys[idx] / 12;
                     keyHSV.value = (keyHSV.value > 1.0 ? 1.0 : keyHSV.value);
                     keyHSV.value = (keyHSV.value < 0.0 ? 0.0 : keyHSV.value);
+
                     keyRGB = hsv_to_rgb(keyHSV); 
                 }
 

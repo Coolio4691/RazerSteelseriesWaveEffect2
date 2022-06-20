@@ -10,17 +10,55 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <linux/limits.h>
+#include <libvirt/libvirt.h>
 
 extern int alphasort(const struct dirent **__e1, const struct dirent **__e2); // vscode requires this
-
 
 #include "globals.h"
 #include "keys.h"
 #include "keyboard.h"
 #include "mouse.h"
+#include "password.h"
 
 static struct input_event inputEvent[64];
 static struct input_event inputEventMouse[64];
+
+
+char* executable_name() {
+    char* name = malloc(PATH_MAX * sizeof(char));
+    
+    int fd = open("/proc/self/comm", O_RDONLY);
+    read(fd, name, sizeof(name));
+
+    return name;
+}
+
+char* get_pwd() {
+    char buff[4096];
+    ssize_t len = readlink("/proc/self/exe", buff, sizeof(buff) - 1);
+    if (len != -1) {
+        buff[len] = 0;
+        
+        char* exeName = executable_name();
+        int exeNameLen = strlen(exeName);
+        
+
+        char* pathStr = malloc((len + 1 - exeNameLen) * sizeof(char));
+
+        for(int i = 0; i <= len - exeNameLen; i++) {
+            pathStr[i] = buff[i];
+        }
+
+        pathStr[len + 1 - exeNameLen] = 0;
+
+        free(exeName);
+        
+        return pathStr;
+    }
+    
+    return "";
+}
+
 
 int startsWith(const char *str, const char *pre) {
     size_t lenpre = strlen(pre);
@@ -174,12 +212,16 @@ static int devicesLocked = 0;
 static int keyQueue = 0;
 static int lockReq = 0;
 
+static int rAltHeld = 0;
+static int rAltHeldTime = 0;
+
 static int keyboardFD;
 static int mouseFD;
 
 static int keyboardConnected = 0;
 static int mouseConnected = 0;
 
+static virConnectPtr conn;
 
 void doLock() {
     devicesLocked = !devicesLocked;
@@ -209,6 +251,12 @@ void checkLock() {
 
 
 void keyDown(int key) {
+    if(!devicesLocked) { 
+        if(key == 100) { // if key == ralt 
+            rAltHeld = 1;
+        }
+    }
+    
     for(int i = 0; lockShortcut[i] != -1; i++) {
         if(lockShortcut[i] == key) {
             lockShortcutPressed[i] = 1;
@@ -228,6 +276,13 @@ void keyDown(int key) {
 }
 
 void keyUp(int key) {
+    if(!devicesLocked) {
+        if(key == 100) { // if key == ralt 
+            rAltHeld = 0;
+            rAltHeldTime = 0;
+        }
+    }
+
     checkLock();
 
     for(int i = 0; lockShortcut[i] != -1; i++) {
@@ -256,6 +311,8 @@ void keyUp(int key) {
 
 
 void mouseDown(int button) {
+    keyQueue++;
+
     // check if led exists
     int led = led_from_button(button);
     if(led <= -1) return;
@@ -265,6 +322,14 @@ void mouseDown(int button) {
 }
 
 void mouseUp(int button) {
+    keyQueue--;
+
+    if(keyQueue <= 0 && lockReq) {
+        doLock();
+
+        lockReq = 0;
+    }
+
     // check if led exists
     int led = led_from_button(button);
     if(led <= -1) return;
@@ -367,18 +432,123 @@ void* keyboardKeyListener(void* threadArgs) {
 }
 
 
+int checkVM(char* VM) {
+    virDomainPtr *domains;
+
+    int VMOn = 0;
+    unsigned int flags = VIR_CONNECT_LIST_DOMAINS_ACTIVE;
+    
+    int ret = virConnectListAllDomains(conn, &domains, flags);
+    if(ret < 0) return -1;
+
+    for(size_t i = 0; i < ret; i++) {
+        // only check if windows is on if not found
+        if(!VMOn) {
+            // set haswindows to 1 then loop and free the rest of the domains
+            if(strcmp(virDomainGetName(domains[i]), VM) == 0) {
+                VMOn = 1;
+            }
+        }
+        
+        // free domain memory
+        virDomainFree(domains[i]);
+    }
+
+    // free memory of domains variable
+    free(domains);
+
+    return VMOn;
+}
+
+void toggleVM(char* VM) {
+    int vmOn = checkVM(VM);
+
+    printf("%s: %s\n", VM, vmOn ? "on" : "off");
+    char* pwd = get_pwd();
+    
+
+    char* scriptPath = strmerge(pwd, "/VMToggle.sh");
+    free(pwd);
+
+
+    char* scriptPathWithOnOff = strmerge(scriptPath, vmOn ? " off " : " on ");
+    free(scriptPath);
+
+
+    char* scriptPathWithArgs = strmerge(scriptPathWithOnOff, VM);
+    free(scriptPathWithOnOff);
+
+
+    char* scriptPathWithSudo = strmerge("\" | sudo -S ", scriptPathWithArgs);
+    free(scriptPathWithArgs);
+
+
+    char* scriptPathWithPass = strmerge(sysPass, scriptPathWithSudo);
+    free(scriptPathWithSudo);
+
+
+    char* scriptPathWithEcho = strmerge("echo \"", scriptPathWithPass);
+    free(scriptPathWithPass);
+
+
+    system(scriptPathWithEcho);
+
+    free(scriptPathWithEcho);
+}
+
+void* vmThread(void* threadArgs) {
+    conn = virConnectOpen("qemu:///system");
+    unsigned int flags = VIR_CONNECT_LIST_DOMAINS_ACTIVE;
+
+    virDomainPtr *domains;
+
+    while(!exitWave) {
+        int ret = checkVM(vmName);
+
+        if(ret >= 0) {
+            hasVM = ret;
+
+            if(rAltHeld) {
+                rAltHeldTime++;
+            
+                if(rAltHeldTime == 25) { // 2.5s
+                    toggleVM(vmName);
+                }
+            }
+        }
+        else {
+            // attempt to reconnect
+            virConnectClose(conn);
+            // sleep for 100ms
+            usleep(100 * 1000);
+            // reconnect
+            virConnectPtr conn = virConnectOpen("qemu:///system");
+        }
+        
+        // sleep for 100ms
+        usleep(100 * 1000);
+    }
+
+    virConnectClose(conn);
+
+    return NULL;
+}
+
 void* initExtras(void* threadArgs) {
     // create thread id variables
     pthread_t keyboardCheckerThread_id;
     pthread_t mouseCheckerThread_id;
+    pthread_t vmCheckerThread_id;
 
     // create threads
     pthread_create(&keyboardCheckerThread_id, NULL, keyboardKeyListener, NULL);
     pthread_create(&mouseCheckerThread_id, NULL, mouseButtonListener, NULL);
+    pthread_create(&vmCheckerThread_id, NULL, vmThread, NULL);
 
     // wait until threads are gone
     pthread_join(keyboardCheckerThread_id, NULL);
     pthread_join(mouseCheckerThread_id, NULL);
+    pthread_join(vmCheckerThread_id, NULL);
 
     return NULL;
 }

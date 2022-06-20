@@ -33,5 +33,12 @@ include_directories(${HIDAPI_INCLUDE_DIRS})
 link_directories(${HIDAPI_LIBRARY_DIRS})
 
 
-target_link_libraries(${PROJECT_NAME} ${DBUS_LIBRARIES} ${RAZER_LIBRARIES} ${LIBUSB_LIBRARIES} ${HIDAPI_LIBRARIES} m) #pthread)
-#target_link_libraries(${PROJECT_NAME} ${LIBUSB_LIBRARIES} ${HIDAPI_LIBRARIES} m)
+pkg_check_modules(LIBVIRT REQUIRED libvirt)
+include_directories(${LIBVIRT_INCLUDE_DIRS})
+link_directories(${LIBVIRT_LIBRARY_DIRS})
+
+
+target_link_libraries(${PROJECT_NAME} ${DBUS_LIBRARIES} ${RAZER_LIBRARIES} ${LIBUSB_LIBRARIES} ${HIDAPI_LIBRARIES} ${LIBVIRT_LIBRARIES} m pthread)
+
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/VMToggle.sh
+    DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
