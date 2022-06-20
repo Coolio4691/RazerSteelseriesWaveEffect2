@@ -508,12 +508,15 @@ void* vmThread(void* threadArgs) {
         if(ret >= 0) {
             hasVM = ret;
 
-            if(rAltHeld) {
+            if(rAltHeld && keyQueue == 1) {
                 rAltHeldTime++;
             
                 if(rAltHeldTime == 25) { // 2.5s
                     toggleVM(vmName);
                 }
+            }
+            else {
+                rAltHeldTime = 0;
             }
         }
         else {
