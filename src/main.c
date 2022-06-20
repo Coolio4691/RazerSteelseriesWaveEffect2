@@ -36,7 +36,7 @@ int main() {
     mouse_init();
     
     // allocate pressed buttons
-    pressedButtons = malloc(RIVAL600_LEDS * sizeof(int));
+    pressedButtons = (int*)malloc(RIVAL600_LEDS * sizeof(int));
     for(int i = 0; i < RIVAL600_LEDS; i++) {
         pressedButtons[i] = 0;
     }

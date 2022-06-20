@@ -53,20 +53,20 @@ void mouse_init() {
     mouse = hid_open(RIVAL600_VID, RIVAL600_PID, NULL);
     
     // left section
-    mouseCols[0] = malloc(4 * sizeof(int));
+    mouseCols[0] = (int*)malloc(4 * sizeof(int));
     mouseCols[0][0] = RIVAL600_TOPLEFT;
     mouseCols[0][1] = RIVAL600_LEFT;
     mouseCols[0][2] = RIVAL600_BOTTOMLEFT;
     mouseCols[0][3] = RIVAL600_NONE;
 
     // middle section
-    mouseCols[1] = malloc(3 * sizeof(int));
+    mouseCols[1] = (int*)malloc(3 * sizeof(int));
     mouseCols[1][0] = RIVAL600_WHEEL;
     mouseCols[1][1] = RIVAL600_LOGO;
     mouseCols[1][2] = RIVAL600_NONE;
 
     // right section
-    mouseCols[2] = malloc(4 * sizeof(int));
+    mouseCols[2] = (int*)malloc(4 * sizeof(int));
     mouseCols[2][0] = RIVAL600_TOPRIGHT;
     mouseCols[2][1] = RIVAL600_RIGHT;
     mouseCols[2][2] = RIVAL600_BOTTOMRIGHT;
@@ -77,7 +77,7 @@ void mouse_init() {
 void set_mouse_led(uint8_t led, struct rgb rgb) {
     if(led >= RIVAL600_LEDS || led < 0) return; 
 
-    uint8_t* header = malloc(HEADER_LENGTH * sizeof(uint8_t));
+    uint8_t* header = (uint8_t*)malloc(HEADER_LENGTH * sizeof(uint8_t));
     for(int i = 0; i < HEADER_LENGTH; i++) {
         header[i] = 0.0f;
     } 
@@ -97,7 +97,7 @@ void set_mouse_led(uint8_t led, struct rgb rgb) {
 
     free(bytearray);
 
-    uint8_t* body = malloc(BODY_LENGTH * sizeof(uint8_t)); // rgb rgb offset
+    uint8_t* body = (uint8_t*)malloc(BODY_LENGTH * sizeof(uint8_t)); // rgb rgb offset
 
     // rgb
     body[0] = rgb.red;
@@ -120,7 +120,7 @@ void set_mouse_led(uint8_t led, struct rgb rgb) {
     free(body);
 
     int reportLen = 3;
-    uint8_t* report = malloc(reportLen * sizeof(uint8_t));
+    uint8_t* report = (uint8_t*)malloc(reportLen * sizeof(uint8_t));
     report[0] = 0x00; // reportid
     report[1] = CMD_LED_COLOR; // command
     report[2] = 0x00; // command

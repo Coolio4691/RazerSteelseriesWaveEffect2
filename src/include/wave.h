@@ -22,7 +22,7 @@ static struct columnValue* colValues;
 
 void wave_init() {
     // allocate memory for columns
-    colValues = malloc((keyboard.lighting.matrix.cols + RIVAL600_COLUMNS) * sizeof(struct columnValue));
+    colValues = (struct columnValue*)malloc((keyboard.lighting.matrix.cols + RIVAL600_COLUMNS) * sizeof(struct columnValue));
     int colValuesSize = 0;
 
     // setup colours
@@ -91,6 +91,8 @@ void* wave_values_loop(void* threadArgs) {
         // wait x amount of microseconds then loop
         usleep(speed * 1000);
     }
+    
+    return NULL;
 }
 
 void* wave(void* threadArgs) {
@@ -102,9 +104,9 @@ void* wave(void* threadArgs) {
     struct rgb rgb;
 
     while(!exitWave) {
-        int col = 0;
+        int colOffset = keyboard.lighting.matrix.cols;
 
-        for(col; col < keyboard.lighting.matrix.cols; col++) {
+        for(int col = 0; col < colOffset; col++) {
             // set hue then get rgb from hsv
             hsv.hue = colValues[col].hue;
             struct rgb rgb = hsv_to_rgb(hsv); 
@@ -128,9 +130,9 @@ void* wave(void* threadArgs) {
         }
 
         // go through mouse rows
-        for(int mouseCol = 0; mouseCol < RIVAL600_COLUMNS; col++, mouseCol++) {
+        for(int mouseCol = 0; mouseCol < RIVAL600_COLUMNS; mouseCol++) {
             // set hue then get rgb from hsv
-            hsv.hue = colValues[col].hue;
+            hsv.hue = colValues[colOffset + mouseCol].hue;
             struct rgb rgb = hsv_to_rgb(hsv);
 
             // set led lights at column to hsv 
@@ -157,6 +159,8 @@ void* wave(void* threadArgs) {
         // wait x amount of microseconds
         usleep(framerate * 1000);
     }
+
+    return NULL;
 }
 
 #endif

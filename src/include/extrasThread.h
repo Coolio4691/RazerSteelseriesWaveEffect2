@@ -33,14 +33,13 @@ int startsWith(const char *str, const char *pre) {
 static char* strmerge(const char* s1, const char* s2) {
 	const size_t n1 = (s1 ? strlen(s1) : 0);
 	const size_t n2 = (s2 ? strlen(s2) : 0);
-	char* s;
-
+	
 	if(!n1 && !n2) {
 		errno = EINVAL;
 		return NULL;
 	}
 
-	s = malloc(n1 + n2 + 1);
+	char* s = (char*)malloc(n1 + n2 + 1);
 	if(!s) {
 		errno = ENOMEM;
 		return NULL;
@@ -252,6 +251,8 @@ void* mouseButtonListener(void* threadArgs) {
             }
         }
     }
+
+    return NULL;
 }
 
 void* keyboardKeyListener(void* threadArgs) {
@@ -292,6 +293,8 @@ void* keyboardKeyListener(void* threadArgs) {
             }
         }
     }
+
+    return NULL;
 }
 
 
@@ -307,6 +310,8 @@ void* initExtras(void* threadArgs) {
     // wait until threads are gone
     pthread_join(keyboardCheckerThread_id, NULL);
     pthread_join(mouseCheckerThread_id, NULL);
+    
+    return NULL;
 }
 
 #endif

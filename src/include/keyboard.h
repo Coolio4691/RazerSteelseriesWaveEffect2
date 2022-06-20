@@ -15,7 +15,7 @@ void keyboard_init() {
 
     keyboard_from_id(devices[0], &keyboard);
 
-    pressedKeys = malloc((keyboard.lighting.matrix.cols * keyboard.lighting.matrix.rows) * sizeof(int));
+    pressedKeys = (int*)malloc((keyboard.lighting.matrix.cols * keyboard.lighting.matrix.rows) * sizeof(int));
     for(int i = 0; i < keyboard.lighting.matrix.cols * keyboard.lighting.matrix.rows; i++) {
         pressedKeys[i] = 0;
     }
