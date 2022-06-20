@@ -1,18 +1,18 @@
 #ifndef __EXTRASTHREAD_H__
 #define __EXTRASTHREAD_H__
+
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stddef.h>
-#include <string.h>
-#include <sys/types.h>
 #include <dirent.h>
 #include <errno.h>
 #include <linux/input.h>
-#include <linux/input-event-codes.h>
 #include <fcntl.h>
-#include <limits.h>
 #include <pthread.h>
+#include <linux/limits.h>
+
+extern int alphasort(const struct dirent **__e1, const struct dirent **__e2); // vscode requires this
+
 
 #include "globals.h"
 #include "keys.h"
@@ -170,10 +170,55 @@ char* find_event(int vendor, int product, int keyboard) {
 // end device functions
 
 // lock mouse and keyboard states
-static int mouseLocked = 0;
-static int keyboardLocked = 0;
+static int devicesLocked = 0;
+static int keyQueue = 0;
+static int lockReq = 0;
+
+static int keyboardFD;
+static int mouseFD;
+
+static int keyboardConnected = 0;
+static int mouseConnected = 0;
+
+
+void doLock() {
+    devicesLocked = !devicesLocked;
+
+    if(keyboardConnected) {
+        ioctl(keyboardFD, EVIOCGRAB, devicesLocked);
+    }
+    if(mouseConnected) {
+        ioctl(mouseFD, EVIOCGRAB, devicesLocked);
+    }
+}
+
+void checkLock() {
+    int toLock = 1;
+    for(int i = 0; lockShortcut[i] != -1; i++) {
+        if(!lockShortcutPressed[i]) {
+            toLock = 0;
+            
+            break;
+        }
+    }
+
+    if(!toLock) return;
+
+    lockReq = 1;
+}
+
 
 void keyDown(int key) {
+    for(int i = 0; lockShortcut[i] != -1; i++) {
+        if(lockShortcut[i] == key) {
+            lockShortcutPressed[i] = 1;
+            
+            break;
+        }
+    }
+
+    keyQueue++;
+
     // check if key at col, row exists
     struct colrow colrow = col_row_from_key(key);
     if(colrow.col <= -1 && colrow.row <= -1) return;
@@ -183,6 +228,24 @@ void keyDown(int key) {
 }
 
 void keyUp(int key) {
+    checkLock();
+
+    for(int i = 0; lockShortcut[i] != -1; i++) {
+        if(lockShortcut[i] == key) {
+            lockShortcutPressed[i] = 0;
+            
+            break;
+        }
+    }
+
+    keyQueue--;
+
+    if(keyQueue <= 0 && lockReq) {
+        doLock();
+
+        lockReq = 0;
+    }
+
     // check if col, row exists
     struct colrow colrow = col_row_from_key(key);
     if(colrow.col <= -1 && colrow.row <= -1) return;
@@ -214,13 +277,16 @@ void mouseUp(int button) {
 void* mouseButtonListener(void* threadArgs) {
     mouseInputPath = find_event(RIVAL600_VID, RIVAL600_PID, 0);
 
-    int mouseFD = open(mouseInputPath, O_RDONLY);    
-    int connected;
+    mouseFD = open(mouseInputPath, O_RDONLY);
 
     while(!exitWave) {
+        mouseConnected = 1;
+
         int readDevice = read(mouseFD, inputEventMouse, sizeof(struct input_event) * 64);
 
         if (readDevice < (int) sizeof(struct input_event)) {
+            mouseConnected = 0;
+
             printf("Mouse error reading - mouse lost?\n");
             close(mouseFD);
 
@@ -257,12 +323,15 @@ void* mouseButtonListener(void* threadArgs) {
 
 void* keyboardKeyListener(void* threadArgs) {
     keyboardInputPath = find_event(keyboard.VIDPID.vidInt, keyboard.VIDPID.pidInt, 1);
-    int keyboardFD = open(keyboardInputPath, O_RDONLY);
+    keyboardFD = open(keyboardInputPath, O_RDONLY);
 
     while(!exitWave) {
+        keyboardConnected = 1;
         int readDevice = read(keyboardFD, inputEvent, sizeof(struct input_event) * 64);
 
         if (readDevice < (int) sizeof(struct input_event)) {
+            keyboardConnected = 0;
+
             printf("Keyboard error reading - keyboard lost?\n");
             close(keyboardFD);
 
@@ -310,7 +379,7 @@ void* initExtras(void* threadArgs) {
     // wait until threads are gone
     pthread_join(keyboardCheckerThread_id, NULL);
     pthread_join(mouseCheckerThread_id, NULL);
-    
+
     return NULL;
 }
 

@@ -19,5 +19,4 @@ make
 Might have a few memory leaks & bugs (which I will try to fix.)
 
 ### TODO
-- Input locking on key sequence.
 - Virtual Machine checker.

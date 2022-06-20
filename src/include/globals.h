@@ -10,4 +10,13 @@ int* pressedKeys;
 // mouse pressed buttons
 int* pressedButtons;
 
+int lockShortcut[] = {
+    42, //lshift
+    29, // lctrl
+    38, // l
+    -1 // end
+};
+
+int* lockShortcutPressed;
+
 #endif

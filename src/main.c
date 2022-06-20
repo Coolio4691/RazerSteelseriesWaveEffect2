@@ -43,9 +43,13 @@ int main() {
     
     keyboard_init();
     wave_init();   
+    
+    // init lock shortcut
+    int lockShortcutSize = 0;
+    for(lockShortcutSize = 0; lockShortcut[lockShortcutSize] >= 0; lockShortcutSize++);
 
-    //keyboardInputPath = find_event(keyboard.VIDPID.vidInt, keyboard.VIDPID.pidInt, 1);
-    //mouseInputPath = find_event(RIVAL600_VID, RIVAL600_PID, 0);
+    lockShortcutPressed = (int*)malloc(lockShortcutSize * sizeof(int));
+    for(int i = 0; i < lockShortcutSize; i++) lockShortcutPressed[i] = 0;
 
     // create threads
     pthread_create(&waveThread_id, NULL, wave, NULL);
