@@ -25,113 +25,176 @@ static struct input_event inputEventMouse[64];
 
 
 char* executable_name() {
+    // allocate path max to name
     char* name = malloc(PATH_MAX * sizeof(char));
     
+    // openexename file
     int fd = open("/proc/self/comm", O_RDONLY);
+    // read exename file
     read(fd, name, sizeof(name));
+    // close exename file
+    close(fd);
 
     return name;
 }
 
 char* get_pwd() {
-    char buff[4096];
+    // allocate 4096 bytes of memory
+    char* buff = (char*)malloc(4096 * sizeof(char));
+    // set string length to output of readlink 
     ssize_t len = readlink("/proc/self/exe", buff, sizeof(buff) - 1);
+    
+    // if string length is not invalid
     if (len != -1) {
+        // set buffer at end to null
         buff[len] = 0;
         
+
+        // get executablename
         char* exeName = executable_name();
+        // get length of exename
         int exeNameLen = strlen(exeName);
-        
-
-        char* pathStr = malloc((len + 1 - exeNameLen) * sizeof(char));
-
-        for(int i = 0; i <= len - exeNameLen; i++) {
-            pathStr[i] = buff[i];
-        }
-
-        pathStr[len + 1 - exeNameLen] = 0;
-
+        // free exename
         free(exeName);
         
+
+        // allocate memory of path 
+        char* pathStr = malloc((len + 1 - exeNameLen) * sizeof(char));
+        // set chars from buff[0] to buff[len - exenamelen] to pathstr
+        memcpy(pathStr, buff, len - exeNameLen);
+        // set char at len + 1 - exenamelen to null
+        pathStr[len + 1 - exeNameLen] = 0;
+
+        // free buffer
+        free(buff);
+        
+        // return string
         return pathStr;
     }
-    
-    return "";
+    // free buffer
+    free(buff);
+    // return null
+    return NULL;
 }
 
 
 int startsWith(const char *str, const char *pre) {
+    // get length of both strings
     size_t lenpre = strlen(pre);
     size_t lenstr = strlen(str);
 
+    // if prefix of the string is the same return true
     return lenstr < lenpre ? 0 : memcmp(pre, str, lenpre) == 0;
 }
 
 // device functions taken from https://www.linuxquestions.org/questions/programming-9/get-dev-input-eventx-from-vid-pid-c-c-906842/
 static char* strmerge(const char* s1, const char* s2) {
+    // set string size to 0 if string is invalid or get size
 	const size_t n1 = (s1 ? strlen(s1) : 0);
+    // set string size to 0 if string is invalid or get size
 	const size_t n2 = (s2 ? strlen(s2) : 0);
 	
+    // if string1 and string2 dont exist return error
 	if(!n1 && !n2) {
 		errno = EINVAL;
 		return NULL;
 	}
 
+    // create string with size of string1 + string2 + nullterminator space
 	char* s = (char*)malloc(n1 + n2 + 1);
+    // if string is invalid return
 	if(!s) {
 		errno = ENOMEM;
 		return NULL;
 	}
 
+    // copy first string to output string
 	if(n1) memcpy(s, s1, n1);
+    // copy second string to output string with offset of first string length
 	if(n2) memcpy(s + n1, s2, n2);
 
+    // set string end to null
 	s[n1 + n2] = 0;
 
+    // return string
 	return s;
 }
 
 static int read_hex(const char* filename) {
+    // open file with "rb" permissions
 	FILE* in = fopen(filename, "rb");
+    // create uint variable
 	unsigned int value;
 
+    // if file is invalid return
 	if(!in) return -1;
 
+    // if it sets value properly close file and return value
 	if(fscanf(in, "%x", &value) == 1) {
-		fclose(in);
-		
+		// close file
+        fclose(in);
+
+        // return value
         return (int)value;
 	}
 
+    // close fine
 	fclose(in);
+    // return error
     return -1;
 }
 
 static int vendor_id(const char* event) {
+    // check if event is valid
 	if(event && *event) {
-		char filename[256];
+        // set filename size to 256 * sizeof(char)
+        size_t filenameSize = 256 * sizeof(char);
+
+        // create filename and result variable
+		char* filename = (char*)malloc(filenameSize);
 		int	result;
 
-		result = snprintf(filename, sizeof(filename), "/sys/class/input/%s/device/id/vendor", event);
-		if(result < 1 || result >= sizeof(filename)) return -1;
+        // set string to /sys/class/input/event/device/id/vendor
+		result = snprintf(filename, filenameSize, "/sys/class/input/%s/device/id/vendor", event);
+        // if result is invalid return with error
+		if(result < 1 || result >= filenameSize) return -1;
 
-		return read_hex(filename);
+        // get hex value
+        int hex = read_hex(filename);
+        // free file name string
+        free(filename);
+        // return hex value
+		return hex;
 	}
 
+    // return error
 	return -1;
 }
 
 static int product_id(const char* event) {
+    // check if event is valid
 	if(event && *event) {
-		char filename[256];
+        // set filename size to 256 * sizeof(char)
+        size_t filenameSize = 256 * sizeof(char);
+
+        // create filename and result variable
+		char* filename = (char*)malloc(filenameSize);
 		int	result;
 
-		result = snprintf(filename, sizeof(filename), "/sys/class/input/%s/device/id/product", event);
-        if(result < 1 || result >= sizeof(filename)) return -1;
+        // set string to /sys/class/input/event/device/id/product
+		result = snprintf(filename, filenameSize, "/sys/class/input/%s/device/id/product", event);
+        // if result is invalid return with error
+        if(result < 1 || result >= filenameSize) return -1;
 
-		return read_hex(filename);
+        // get hex value
+        int hex = read_hex(filename);
+        // free file name string
+        free(filename);
+        // return hex value
+		return hex;
 	}
 
+    // return error
 	return -1;
 }
 
@@ -192,6 +255,14 @@ char* find_event(int vendor, int product, int keyboard) {
                 }
             }
 
+            // free file names
+            for (int i = 0; i < numFiles; i++) {
+                // free name
+                free(namelist[i]);
+            }
+            // free list
+            free(namelist);
+            
             // return name if exists
 			if(name) return name;
 
@@ -200,6 +271,14 @@ char* find_event(int vendor, int product, int keyboard) {
 			return NULL;
 		}
 	}
+
+    // free file names
+	for (int i = 0; i < numFiles; i++) {
+		// free name
+        free(namelist[i]);
+	}
+    // free list
+	free(namelist);
 
     errno = ENOENT;
     return NULL;
@@ -224,39 +303,39 @@ static int mouseConnected = 0;
 static virConnectPtr conn;
 
 void doLock() {
+    // invert deviceslocked
     devicesLocked = !devicesLocked;
 
-    if(keyboardConnected) {
-        ioctl(keyboardFD, EVIOCGRAB, devicesLocked);
-    }
-    if(mouseConnected) {
-        ioctl(mouseFD, EVIOCGRAB, devicesLocked);
-    }
+    // if keyboard is connected lock it
+    if(keyboardConnected) ioctl(keyboardFD, EVIOCGRAB, devicesLocked);
+    // if mouse is connected lock it
+    if(mouseConnected) ioctl(mouseFD, EVIOCGRAB, devicesLocked);
 }
 
 void checkLock() {
-    int toLock = 1;
+    // loop through lockshortcut
     for(int i = 0; lockShortcut[i] != -1; i++) {
+        // if key is not pressed return
         if(!lockShortcutPressed[i]) {
-            toLock = 0;
-            
-            break;
+            return; 
         }
     }
 
-    if(!toLock) return;
-
+    // if fully looped without returning set lock to 1
     lockReq = 1;
 }
 
 
 void keyDown(int key) {
+    // if devices are not locked check if key is ralt
     if(!devicesLocked) { 
         if(key == 100) { // if key == ralt 
+            // set raltheld to true
             rAltHeld = 1;
         }
     }
     
+    // if key is in lock shortcut set to pressed
     for(int i = 0; lockShortcut[i] != -1; i++) {
         if(lockShortcut[i] == key) {
             lockShortcutPressed[i] = 1;
@@ -265,10 +344,12 @@ void keyDown(int key) {
         }
     }
 
+    // increment key queue
     keyQueue++;
 
     // check if key at col, row exists
     struct colrow colrow = col_row_from_key(key);
+    // if col and row are invalid return
     if(colrow.col <= -1 && colrow.row <= -1) return;
 
     // set key at col, row to 11
@@ -283,8 +364,10 @@ void keyUp(int key) {
         }
     }
 
+    // check if lock is fully pressed
     checkLock();
 
+    // if key is in lockshortcut set to not pressed
     for(int i = 0; lockShortcut[i] != -1; i++) {
         if(lockShortcut[i] == key) {
             lockShortcutPressed[i] = 0;
@@ -293,16 +376,21 @@ void keyUp(int key) {
         }
     }
 
+    // decrement keyqueue
     keyQueue--;
 
+    // if keyqueue is none and lock request
     if(keyQueue <= 0 && lockReq) {
+        // lock devices
         doLock();
 
+        // set lock request to 0
         lockReq = 0;
     }
 
     // check if col, row exists
     struct colrow colrow = col_row_from_key(key);
+    // return if col and rol are invalid
     if(colrow.col <= -1 && colrow.row <= -1) return;
 
     // set key at col, row to 10 
@@ -311,10 +399,12 @@ void keyUp(int key) {
 
 
 void mouseDown(int button) {
+    // increment keyqueue
     keyQueue++;
 
     // check if led exists
     int led = led_from_button(button);
+    // if led is invalid return
     if(led <= -1) return;
 
     // set button at led to 11
@@ -322,16 +412,21 @@ void mouseDown(int button) {
 }
 
 void mouseUp(int button) {
+    // decrement keyqueue
     keyQueue--;
 
+    // if keyqueue is none and there is a request to lock dolock
     if(keyQueue <= 0 && lockReq) {
+        // lock devices
         doLock();
 
+        // set lock request to 0
         lockReq = 0;
     }
 
     // check if led exists
     int led = led_from_button(button);
+    // if led does not exist return
     if(led <= -1) return;
 
     // set button at led to 10
@@ -340,16 +435,21 @@ void mouseUp(int button) {
 
 
 void* mouseButtonListener(void* threadArgs) {
+    // get input path
     mouseInputPath = find_event(RIVAL600_VID, RIVAL600_PID, 0);
-
+    // open mouseinputpath
     mouseFD = open(mouseInputPath, O_RDONLY);
-
+    
+    // loop till exit signal is given
     while(!exitWave) {
+        // set mouse connected to 1
         mouseConnected = 1;
 
+        // read for input
         int readDevice = read(mouseFD, inputEventMouse, sizeof(struct input_event) * 64);
 
-        if (readDevice < (int) sizeof(struct input_event)) {
+        // if output is wrong reconnect
+        if(readDevice < (int) sizeof(struct input_event)) {
             mouseConnected = 0;
 
             printf("Mouse error reading - mouse lost?\n");
@@ -357,71 +457,94 @@ void* mouseButtonListener(void* threadArgs) {
 
             usleep(500 * 1000);
             // try reconnecting after 500ms
+            // free mouse input path
+            free(mouseInputPath);
+            // get mouse input path
             mouseInputPath = find_event(RIVAL600_VID, RIVAL600_PID, 0);
             mouseFD = open(mouseInputPath, O_RDONLY);  
             
             continue;
         }
         else {
-            for (long unsigned int i = 0; i < readDevice / sizeof(struct input_event); i++) {
+            // loop through output
+            for(long unsigned int i = 0; i < readDevice / sizeof(struct input_event); i++) {
+                // check if event type is key
+                if(inputEventMouse[i].type == EV_KEY) {
+                    switch(inputEventMouse[i].value) {
+                    case 0:
+                        // if value is keyup do mouseup function
+                        mouseUp(inputEventMouse[i].code);
 
-                if (inputEventMouse[i].type == EV_KEY) {
-                    switch (inputEventMouse[i].value) {
-                        case 0:
-                            mouseUp(inputEventMouse[i].code);
+                        break;
+                    case 1:
+                        // if value is keydown do mousedown function
+                        mouseDown(inputEventMouse[i].code);
 
-                            break;
-                        case 1:
-                            mouseDown(inputEventMouse[i].code);
-
-                            break;
-                        default:
-                            break;
+                        break;
+                    default:
+                        break;
                     }
                 }
             }
         }
     }
 
+    // exit
     return NULL;
 }
 
 void* keyboardKeyListener(void* threadArgs) {
+    // get input path
     keyboardInputPath = find_event(keyboard.VIDPID.vidInt, keyboard.VIDPID.pidInt, 1);
+    // open input path file
     keyboardFD = open(keyboardInputPath, O_RDONLY);
 
+    // loop till exit signal
     while(!exitWave) {
+        // set connected to 1
         keyboardConnected = 1;
+        // read for input from input path file
         int readDevice = read(keyboardFD, inputEvent, sizeof(struct input_event) * 64);
 
-        if (readDevice < (int) sizeof(struct input_event)) {
+        // if output is wrong reconnect
+        if(readDevice < (int) sizeof(struct input_event)) {
+            // set connected to 0
             keyboardConnected = 0;
 
+            // print exit then close file connection
             printf("Keyboard error reading - keyboard lost?\n");
             close(keyboardFD);
 
-            usleep(500 * 1000);
             // try reconnecting after 500ms
+            usleep(500 * 1000);
+
+            // free keyboard input path
+            free(keyboardInputPath);
+            // get keyboard input path
             keyboardInputPath = find_event(keyboard.VIDPID.vidInt, keyboard.VIDPID.pidInt, 1);
+            // open path as file
             keyboardFD = open(keyboardInputPath, O_RDONLY);  
             
             continue;
         }
         else {
-            for (long unsigned int i = 0; i < readDevice / sizeof(struct input_event); i++) {
+            // loop through output
+            for(long unsigned int i = 0; i < readDevice / sizeof(struct input_event); i++) {
+                // if input is type key check values
+                if(inputEvent[i].type == EV_KEY) {
+                    switch(inputEvent[i].value) {
+                    case 0:
+                        // if output is keyup do keyup function
+                        keyUp(inputEvent[i].code);
 
-                if (inputEvent[i].type == EV_KEY) {
-                    switch (inputEvent[i].value) {
-                        case 0:
-                            keyUp(inputEvent[i].code);
+                        break;
+                    case 1:
+                        // if output is keydown do keydown function
+                        keyDown(inputEvent[i].code);
 
-                            break;
-                        case 1:
-                            keyDown(inputEvent[i].code);
-
-                            break;
-                        default:
-                            break;
+                        break;
+                    default:
+                        break;
                     }
                 }
             }
@@ -433,105 +556,102 @@ void* keyboardKeyListener(void* threadArgs) {
 
 
 int checkVM(char* VM) {
-    virDomainPtr *domains;
-
+    // set return value to 0
     int VMOn = 0;
-    unsigned int flags = VIR_CONNECT_LIST_DOMAINS_ACTIVE;
+    // get domain by name
+    virDomainPtr domain = virDomainLookupByName(conn, VM);
+    // if domain doesnt exist return with exit code
+    if(!domain) return -1;
     
-    int ret = virConnectListAllDomains(conn, &domains, flags);
-    if(ret < 0) return -1;
+    // create info variable
+    virDomainInfo info;
+    // get domain info into variable
+    virDomainGetInfo(domain, &info);
+    // set vmon to running state
+    VMOn = info.state == VIR_DOMAIN_RUNNING; 
+    
+    // free domain memory
+    virDomainFree(domain);
 
-    for(size_t i = 0; i < ret; i++) {
-        // only check if windows is on if not found
-        if(!VMOn) {
-            // set haswindows to 1 then loop and free the rest of the domains
-            if(strcmp(virDomainGetName(domains[i]), VM) == 0) {
-                VMOn = 1;
-            }
-        }
-        
-        // free domain memory
-        virDomainFree(domains[i]);
-    }
-
-    // free memory of domains variable
-    free(domains);
-
+    // return if vm is on or off
     return VMOn;
 }
 
 void toggleVM(char* VM) {
-    int vmOn = checkVM(VM);
-
-    printf("%s: %s\n", VM, vmOn ? "on" : "off");
-    char* pwd = get_pwd();
-    
-
+    // merge pwd with /VMToggle.sh
     char* scriptPath = strmerge(pwd, "/VMToggle.sh");
-    free(pwd);
 
-
-    char* scriptPathWithOnOff = strmerge(scriptPath, vmOn ? " off " : " on ");
+    // merge string with either " off " or " on "
+    char* scriptPathWithOnOff = strmerge(scriptPath, hasVM ? " off " : " on ");
+    // free previous string
     free(scriptPath);
 
-
+    // merge string with vm name
     char* scriptPathWithArgs = strmerge(scriptPathWithOnOff, VM);
+    // free previous string
     free(scriptPathWithOnOff);
 
-
+    // merge " | sudo -S " with string
     char* scriptPathWithSudo = strmerge("\" | sudo -S ", scriptPathWithArgs);
+    // free previous string
     free(scriptPathWithArgs);
 
-
+    // merge pass with string
     char* scriptPathWithPass = strmerge(sysPass, scriptPathWithSudo);
+    // free previous string
     free(scriptPathWithSudo);
 
-
+    // merge echo with string
     char* scriptPathWithEcho = strmerge("echo \"", scriptPathWithPass);
+    // free previous string
     free(scriptPathWithPass);
 
-
+    // execute command
     system(scriptPathWithEcho);
-
+    // free previous string
     free(scriptPathWithEcho);
 }
 
 void* vmThread(void* threadArgs) {
+    // connect to qemu
     conn = virConnectOpen("qemu:///system");
-    unsigned int flags = VIR_CONNECT_LIST_DOMAINS_ACTIVE;
 
-    virDomainPtr *domains;
-
+    // loop till exit signal is given
     while(!exitWave) {
+        // check if vm is on
         int ret = checkVM(vmName);
 
+        // if return value is valid do
         if(ret >= 0) {
+            // set has vm to vm on off state
             hasVM = ret;
 
             if(rAltHeld && keyQueue <= 1) {
-                rAltHeldTime++;
+                rAltHeldTime++; // increment raltheldtime by one
             
-                if(rAltHeldTime == 25) { // 2.5s
+                if(rAltHeldTime == 25) { // ralt held for 2.5s
+                    // toggle vm on/off
                     toggleVM(vmName);
                 }
             }
             else {
                 rAltHeldTime = 0;
             }
-        }
+        } // else if invalid reconnect and try again
         else {
             // attempt to reconnect
             virConnectClose(conn);
             // sleep for 100ms
             usleep(100 * 1000);
             // reconnect
-            virConnectPtr conn = virConnectOpen("qemu:///system");
+            conn = virConnectOpen("qemu:///system");
         }
         
         // sleep for 100ms
         usleep(100 * 1000);
     }
 
+    // close connection then exit
     virConnectClose(conn);
 
     return NULL;

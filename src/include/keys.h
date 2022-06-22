@@ -141,27 +141,24 @@ static struct buttonMap buttonPositions[] = {
 };
 
 struct colrow col_row_from_key(int key) {
-    struct colrow toReturn = { -1, -1 };
-
+    // loop through keys
     for(int i = 0; keyPositions[i].key != -1; i++) {
-        if(keyPositions[i].key != key) continue;
-
-        toReturn = keyPositions[i].value;        
+        // if key == key return colrow
+        if(keyPositions[i].key == key) return keyPositions[i].value;
     }
 
-    return toReturn;
+    return (struct colrow){ -1, -1 };
 }
 
 int led_from_button(int button) {
-    int toReturn = -1;
-
+    // loop through buttons
     for(int i = 0; buttonPositions[i].button != -1; i++) {
-        if(buttonPositions[i].button != button) continue;
-
-        toReturn = buttonPositions[i].value;        
+        // if button == button return led
+        if(buttonPositions[i].button == button) return buttonPositions[i].value;        
     }
 
-    return toReturn;
+    // return -1
+    return -1;
 }
 
 #endif

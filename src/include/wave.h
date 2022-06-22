@@ -21,16 +21,19 @@ struct columnValue {
 static struct columnValue* colValues;
 
 void wave_init() {
-    // allocate memory for columns
+    // allocate keyboardcols + mousecols to colvalues
     colValues = (struct columnValue*)malloc((keyboard.lighting.matrix.cols + RIVAL600_COLUMNS) * sizeof(struct columnValue));
+    // set colvaluessize to 0
     int colValuesSize = 0;
 
     // setup colours
-    
     struct columnValue colValue;
-    colValue.rows = NULL; // set to null to get automatically
+    // set to null to get automatically
+    colValue.rows = NULL;
+    // set hue to minhue
     colValue.hue = minHue;
-    colValue.reverse = 0;
+    // set reverse to false
+    colValue.reverse = 0; 
 
     // initialize column colours
     for(int col = 0; col < keyboard.lighting.matrix.cols + RIVAL600_COLUMNS; col++) {
@@ -55,6 +58,7 @@ void wave_init() {
 }
 
 void* wave_values_loop(void* threadArgs) {
+    // loop till exit signal
     while(!exitWave) {
         // go through all columns
         for(int col = 0; col < keyboard.lighting.matrix.cols + RIVAL600_COLUMNS; col++) {
@@ -76,15 +80,19 @@ void* wave_values_loop(void* threadArgs) {
             }
         }
 
+        // loop through cols and rows
         for(int i = 0; i < keyboard.lighting.matrix.cols * keyboard.lighting.matrix.rows; i++) {
+            // if key is pressed and less than 11 decrement
             if(pressedKeys[i] > 0 && pressedKeys[i] <= 10) {
-                pressedKeys[i] -= 1;
+                pressedKeys[i]--;
             }
         }
 
+        // loop through mouse leds
         for(int i = 0; i < RIVAL600_LEDS; i++) {
+            // if button is pressed and less than 11 decrement
             if(pressedButtons[i] > 0 && pressedButtons[i] <= 10) {
-                pressedButtons[i] -= 1;
+                pressedButtons[i]--;
             }
         }
 
@@ -92,47 +100,70 @@ void* wave_values_loop(void* threadArgs) {
         usleep(speed * 1000);
     }
     
+    // return null
     return NULL;
 }
 
 void* wave(void* threadArgs) {
     // init hsv saturation and value to 1
     struct hsv hsv;
+    // set saturation to 1.0
     hsv.saturation = 1.0;
+    // set value to 1.0
     hsv.value = 1.0;
+
     // create rgb value
     struct rgb rgb;
 
+    // while no exit signal
     while(!exitWave) {
+        // set column offset to keyboardcols
         int colOffset = keyboard.lighting.matrix.cols;
 
+        // loop through keyboard columns
         for(int col = 0; col < colOffset; col++) {
             // set hue then get rgb from hsv
             hsv.hue = colValues[col].hue;
+            
+            // get rgb from hsv
             struct rgb rgb = hsv_to_rgb(hsv); 
 
             // set key lights at column to hsv 
             for(int row = 0; row < keyboard.lighting.matrix.rows; row++) {
+                // get key index from col, row
                 int idx = key_index_from_2D(&keyboard.lighting, col, row);
+                // get keyrgb and keyhsv
                 struct rgb keyRGB = rgb;
                 struct hsv keyHSV = hsv;
+                int keyChanged = 0;
 
+                // if key == scrl lk and vm is on set to red
                 if(row == 0 && col == 16 && !hasVM) {
+                    // set hue to red
                     keyHSV.hue = 1;
-                    keyHSV.value = 1.0;
+                    // make value dark
+                    keyHSV.value = 0.4;
                     
-                    keyRGB = hsv_to_rgb(keyHSV); 
+                    // set key changed to 1
+                    keyChanged = 1;
                 }
                 
+                // if key is pressed
                 if(pressedKeys[idx] > 0) {
+                    // set value to value - pressedkeys[key] / 12
                     keyHSV.value -= (double)pressedKeys[idx] / 12;
-                    keyHSV.value = (keyHSV.value > 1.0 ? 1.0 : keyHSV.value);
+                    // if value < 0 set to 0
                     keyHSV.value = (keyHSV.value < 0.0 ? 0.0 : keyHSV.value);
 
-                    keyRGB = hsv_to_rgb(keyHSV); 
+                    // set key changed to 1
+                    keyChanged = 1;
                 }
 
-                keyboard_set_key_light(&keyboard, idx, keyRGB.red, keyRGB.green, keyRGB.blue);
+                // set keyrgb to rgb from keyhsv if key is changed
+                if(keyChanged) keyRGB = hsv_to_rgb(keyHSV); 
+
+                // set key light at index to rgb
+                device_lighting_set_led(&keyboard.lighting, idx, keyRGB.red, keyRGB.green, keyRGB.blue);
             }
         }
 
@@ -140,23 +171,32 @@ void* wave(void* threadArgs) {
         for(int mouseCol = 0; mouseCol < RIVAL600_COLUMNS; mouseCol++) {
             // set hue then get rgb from hsv
             hsv.hue = colValues[colOffset + mouseCol].hue;
+            
+            // get rgb from hsv
             struct rgb rgb = hsv_to_rgb(hsv);
 
             // set led lights at column to hsv 
             for(int row = 0; mouseCols[mouseCol][row] != -1; row++) {
+                // set buttonrgb to col rgb
                 struct rgb buttonRGB = rgb;
+                // get led from col and row
                 int led = mouseCols[mouseCol][row];
 
+                // if button is pressed set hsv
                 if(pressedButtons[led] > 0) {
+                    // set buttonhsv to col hsv
                     struct hsv buttonHSV = hsv;
 
+                    // set buttonhsv value to buttonhsv value - pressedbuttons[led] / 12
                     buttonHSV.value -= (double)pressedButtons[led] / 12;
-                    buttonHSV.value = (buttonHSV.value > 1.0 ? 1.0 : buttonHSV.value);
+                    // if buttonhsv value < 0 set buttonhsv value to 0
                     buttonHSV.value = (buttonHSV.value < 0.0 ? 0.0 : buttonHSV.value);
+                    
+                    // set buttonrgb to rgb from hsv
                     buttonRGB = hsv_to_rgb(buttonHSV); 
-
                 }
 
+                // set mouse led at index to rgb
                 set_mouse_led(led, buttonRGB);
             }
         }
@@ -167,6 +207,7 @@ void* wave(void* threadArgs) {
         usleep(framerate * 1000);
     }
 
+    // return null
     return NULL;
 }
 

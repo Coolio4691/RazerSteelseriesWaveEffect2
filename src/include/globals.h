@@ -6,18 +6,19 @@ static char* keyboardInputPath;
 static char* mouseInputPath;
 
 // keyboard pressed keys
-int* pressedKeys;
+static int* pressedKeys;
 // mouse pressed buttons
-int* pressedButtons;
+static int* pressedButtons;
 
-int lockShortcut[] = {
+static int lockShortcut[] = {
     42, //lshift
     29, // lctrl
     38, // l
     -1 // end
 };
 
-int* lockShortcutPressed;
+static char* pwd;
+static int* lockShortcutPressed;
 
 
 static char* vmName = "win10"; 

@@ -18,11 +18,13 @@
 #include "extrasThread.h"
 
 void exit_signal(int signum) {
+    // set exit to 1
     exitWave = 1;
 }
 
 int main() {
-    signal(SIGINT, exit_signal);
+    signal(SIGINT, exit_signal); // set signal handler for exiting
+    pwd = get_pwd(); // get pwd in pwd variable
 
     pthread_t waveThread_id;
     pthread_t waveValuesThread_id;
@@ -38,6 +40,7 @@ int main() {
     // allocate pressed buttons
     pressedButtons = (int*)malloc(RIVAL600_LEDS * sizeof(int));
     for(int i = 0; i < RIVAL600_LEDS; i++) {
+        // set button pressed to 0
         pressedButtons[i] = 0;
     }
     
@@ -65,6 +68,14 @@ int main() {
     free(keyboardInputPath);
     // free mouse input path
     free(mouseInputPath);
+    // free lockshortcut pressed
+    free(lockShortcutPressed);
+    // free pressedbuttons
+    free(pressedButtons);
+    // free pressedkeys
+    free(pressedKeys);
+    // free pwd string
+    free(pwd);
 
     // close connection to mouse and hid
     mouse_exit();

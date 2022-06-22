@@ -136,6 +136,8 @@ void set_mouse_led(uint8_t led, struct rgb rgb) {
 
 void mouse_exit() {
     hid_close(mouse);
+
+    for(int i = 0; i < RIVAL600_COLUMNS; i++) free(mouseCols[i]);
 }
 
 #endif

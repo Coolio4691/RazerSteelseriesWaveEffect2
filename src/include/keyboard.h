@@ -22,7 +22,7 @@ void keyboard_init() {
 }
 
 void keyboard_set_key(struct keyboard* keyboard, int col, int row, struct rgb rgb) {
-    device_lighting_set_key(&keyboard->lighting, key_index_from_2D(&keyboard->lighting, col, row), rgb.red, rgb.green, rgb.blue);
+    device_lighting_set_led(&keyboard->lighting, key_index_from_2D(&keyboard->lighting, col, row), rgb.red, rgb.green, rgb.blue);
 }
 
 #endif

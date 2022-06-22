@@ -28,8 +28,13 @@ sleep 2
 umount -fq /media/Storage
 umount -fq /dev/nvme0n1p3
 
+# function to start barrier
+startbarrier() {
+   barrier > /dev/null 2>&1 & disown
+}
+
 #start barrier if it isnt already started
-pgrep -x barrier > /dev/null || barrier > /dev/null 2>&1 & disown
+pgrep -x barrier > /dev/null || startbarrier
 
 virsh start $2
 #swap monitor input to displayport
