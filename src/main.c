@@ -57,12 +57,12 @@ int main() {
     // create threads
     pthread_create(&waveThread_id, NULL, wave, NULL);
     pthread_create(&waveValuesThread_id, NULL, wave_values_loop, NULL);
-    pthread_create(&extrasThread_id, NULL, initExtras, NULL);
+    //pthread_create(&extrasThread_id, NULL, initExtras, NULL);
     
     // wait for threads to exit
     pthread_join(waveThread_id, NULL);
     pthread_join(waveValuesThread_id, NULL);
-    pthread_join(extrasThread_id, NULL);
+    //pthread_join(extrasThread_id, NULL);
 
     // free keyboard input path
     free(keyboardInputPath);

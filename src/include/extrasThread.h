@@ -24,46 +24,44 @@ static struct input_event inputEvent[64];
 static struct input_event inputEventMouse[64];
 
 
-char* executable_name() {
+size_t executable_name(char** exeName) {
     // allocate path max to name
-    char* name = malloc(PATH_MAX * sizeof(char));
+    *exeName = (char*)malloc(PATH_MAX * sizeof(char));
     
     // openexename file
     int fd = open("/proc/self/comm", O_RDONLY);
     // read exename file
-    read(fd, name, sizeof(name));
+    size_t len = read(fd, *exeName, PATH_MAX * sizeof(char));
     // close exename file
     close(fd);
 
-    return name;
+    return len;
 }
 
 char* get_pwd() {
     // allocate 4096 bytes of memory
     char* buff = (char*)malloc(4096 * sizeof(char));
     // set string length to output of readlink 
-    ssize_t len = readlink("/proc/self/exe", buff, sizeof(buff) - 1);
+    ssize_t len = readlink("/proc/self/exe", buff, 4096 * sizeof(char));
     
     // if string length is not invalid
     if (len != -1) {
         // set buffer at end to null
         buff[len] = 0;
-        
 
         // get executablename
-        char* exeName = executable_name();
-        // get length of exename
-        int exeNameLen = strlen(exeName);
+        char* exeName;
+        size_t exeNameLen = executable_name(&exeName);
+
         // free exename
         free(exeName);
-        
 
         // allocate memory of path 
-        char* pathStr = malloc((len + 1 - exeNameLen) * sizeof(char));
+        char* pathStr = (char*)malloc(((len + 1) - exeNameLen) * sizeof(char));
         // set chars from buff[0] to buff[len - exenamelen] to pathstr
-        memcpy(pathStr, buff, len - exeNameLen);
+        for(int i = 0; i < len - exeNameLen; i++) pathStr[i] = buff[i];
         // set char at len + 1 - exenamelen to null
-        pathStr[len + 1 - exeNameLen] = 0;
+        pathStr[len - exeNameLen] = 0;
 
         // free buffer
         free(buff);
@@ -71,6 +69,7 @@ char* get_pwd() {
         // return string
         return pathStr;
     }
+
     // free buffer
     free(buff);
     // return null
