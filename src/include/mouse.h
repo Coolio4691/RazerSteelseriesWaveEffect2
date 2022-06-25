@@ -12,6 +12,9 @@
 static hid_device* mouse;
 
 
+#define RIVAL600_VIDSTR "1038"
+#define RIVAL600_PIDSTR "1724"
+
 #define RIVAL600_VID 0x1038
 #define RIVAL600_PID 0x1724
 #define RIVAL600_LEDS 8

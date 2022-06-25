@@ -119,169 +119,214 @@ static char* strmerge(const char* s1, const char* s2) {
 	return s;
 }
 
-static int read_hex(const char* filename) {
-    // open file with "rb" permissions
-	FILE* in = fopen(filename, "rb");
-    // create uint variable
-	unsigned int value;
+size_t split(char* str, char delim, char ***array) {
+    // set elements to 1
+    size_t elements = 1;
+    // get string length
+    size_t stringLen = strlen(str);
 
-    // if file is invalid return
-	if(!in) return -1;
+    // loop through string
+    for(size_t i = 0; i < stringLen; i++) {
+        // if string at index is delim up elements count
+        if(str[i] == delim) {
+            elements++;
+        }
+    }
 
-    // if it sets value properly close file and return value
-	if(fscanf(in, "%x", &value) == 1) {
-		// close file
-        fclose(in);
+    // allocate elements 
+    *array = (char**)calloc(sizeof(char*), elements);
+    
+    // allocate string length + null terminator to buffer for max string 
+    char* buf = (char*)calloc(sizeof(char), stringLen + 1);
+    // set buf len to 0
+    size_t bufLen = 0;
+    
+    // current element index
+    size_t curElement = 0;
+    // loop through string
+    for(size_t i = 0; i < stringLen; i++) {
+        // if string at index is delim
+        if(str[i] == delim) {
+            // set buf at buflen to null terminator
+            buf[bufLen] = 0;
+ 
+            // allocate string to array[curelement] 
+            (*array)[curElement] = (char*)calloc(sizeof(char), bufLen + 1);
+            // copy buf toarray[curelement] 
+            memcpy((*array)[curElement++], buf, bufLen + 1);
+            
+            // set buflen to 0
+            bufLen = 0;
 
-        // return value
-        return (int)value;
-	}
+            continue;
+        }
 
-    // close fine
-	fclose(in);
-    // return error
-    return -1;
+        // append char to buf and up buflen
+        buf[bufLen++] = str[i];
+    }           
+
+    // set buf at buflen to 0
+    buf[bufLen] = 0;
+
+    // allocate buflen + nullterminator to array[curelement]
+    (*array)[curElement] = (char*)calloc(sizeof(char), bufLen + 1);
+    // copy contents of buf to array[curelement]
+    memcpy((*array)[curElement], buf, bufLen + 1);
+
+    // free buf
+    free(buf);
+    
+    // return amount of elements
+    return elements;
 }
 
-static int vendor_id(const char* event) {
-    // check if event is valid
-	if(event && *event) {
-        // set filename size to 256 * sizeof(char)
-        size_t filenameSize = 256 * sizeof(char);
+size_t getLine(FILE* file, char** out) {
+    // allocate a max of 4096 chars per line and set outlen to 0
+    *out = (char*)calloc(sizeof(char), 4096);
+    size_t outLen = 0;
 
-        // create filename and result variable
-		char* filename = (char*)malloc(filenameSize);
-		int	result;
+    // get buffer char
+    char c;
+    while((c = getc(file))) {
+        // check if end of file or new line
+        if(feof(file) || c == '\n') {
+            // set output at outputlen to null terminator
+            (*out)[outLen] = 0;
+            
+            break;
+        }
 
-        // set string to /sys/class/input/event/device/id/vendor
-		result = snprintf(filename, filenameSize, "/sys/class/input/%s/device/id/vendor", event);
-        // if result is invalid return with error
-		if(result < 1 || result >= filenameSize) return -1;
+        // append char to output
+        (*out)[outLen++] = c;
+    }
 
-        // get hex value
-        int hex = read_hex(filename);
-        // free file name string
-        free(filename);
-        // return hex value
-		return hex;
-	}
-
-    // return error
-	return -1;
+    // return outputlen
+    return outLen;
 }
 
-static int product_id(const char* event) {
-    // check if event is valid
-	if(event && *event) {
-        // set filename size to 256 * sizeof(char)
-        size_t filenameSize = 256 * sizeof(char);
+char* find_event(char* vendorId, char* productId, int keyboard) {       
+    FILE* devicesFile;
+ 
+    char* eventStr; 
+    char* deviceListPath = "/proc/bus/input/devices";
+    int deviceFound = 0;
+    
+    // open file into variable
+    devicesFile = fopen(deviceListPath, "r");
 
-        // create filename and result variable
-		char* filename = (char*)malloc(filenameSize);
-		int	result;
+    // allocate "Vendor=vendorid Product=productid"
+    char* searchStr = (char*)calloc(sizeof(char), 25);
+    // set to vendor=vendorid product=productid
+    sprintf(searchStr, "Vendor=%s Product=%s", vendorId, productId);
+    
+    // file buffer for current string
+    char* fileBuffer;
+    
+    while(1) {
+        // get line from file
+        getLine(devicesFile, &fileBuffer);
 
-        // set string to /sys/class/input/event/device/id/product
-		result = snprintf(filename, filenameSize, "/sys/class/input/%s/device/id/product", event);
-        // if result is invalid return with error
-        if(result < 1 || result >= filenameSize) return -1;
+        // if device is not found look for event with vid, pid
+        if(!deviceFound) {
+            // if search str is in string set device found to true
+            char* substr = strstr(fileBuffer, searchStr);
 
-        // get hex value
-        int hex = read_hex(filename);
-        // free file name string
-        free(filename);
-        // return hex value
-		return hex;
-	}
+            if(substr != NULL) {
+                // set device found to true
+                deviceFound = 1;
 
-    // return error
-	return -1;
-}
-
-char* find_event(int vendor, int product, int keyboard) {
-	struct dirent* entry;
-    struct dirent **namelist;
-
-    int numFiles = 0, file = 0;
-
-    // get all files in alphabetical order
-    numFiles = scandir("/sys/class/input", &namelist, NULL, alphasort);
-
-    // loop through every file in folder in alphabetical order
-	while(file++ != numFiles) {
-        // get current entry
-        entry = namelist[file];
-
-		if(vendor_id(entry->d_name) == vendor && product_id(entry->d_name) == product) {
-			char* name = strmerge("/dev/input/", entry->d_name);
-
-            // ignore mouse and led event types if keyboard
-            if(keyboard) {
-                char* subStr = strstr(name, "mouse");
-
-                if(subStr) continue;
-
-                // buffer for realpath
-                char buf[PATH_MAX];
-                // evstr = /sys/class/input/curfile
-                char* evStr = strmerge("/sys/class/input/", entry->d_name); 
-
-                // get realpath from symlink at /sys/class/input/curfile
-                char* res = realpath(evStr, buf);
-                // free evstr memory
-                free(evStr);
-
-                // string for file location of capabilities/led
-	            char* ledStr;
-                if(startsWith(entry->d_name, "event")) ledStr = strmerge(res, "/../capabilities/led");
-                else ledStr = strmerge(res, "/capabilities/led");
-
-                // open file at location ledstr 
-                int ledFile = open(ledStr, O_RDONLY);
-                // free led string
-                free(ledStr);
+                // free searchstr and set to event
+                free(searchStr);
                 
-                // if file exists check if it isnt an led type
-                if(ledFile > -1) {
-                    // char at first position of file
-                    char num;
-                    read(ledFile, &num, sizeof(char));
+                // allocate "event" + nullterminator
+                searchStr = (char*)calloc(sizeof(char), 6);
+                strcat(searchStr, "event\0");
+            }
+        }
+        // if device is found look if its the right device and get its event
+        else {
+            // check if filebuffer contains leds
+            char* substr = strstr(fileBuffer, "leds");
+            if(substr != NULL) {
+                // if contains mouse set found to false and search again
+                deviceFound = 0;
+            }
 
-                    // close file
-                    close(ledFile);
-
-                    // if num > 0 skip this event device
-                    if(num != '0') continue;
+            // check if filebuffer contains kbd if keyboard is false
+            if(!keyboard) {
+                substr = strstr(fileBuffer, "kbd");
+                if(substr != NULL) {
+                    // if contains mouse set found to false and search again
+                    deviceFound = 0;
+                }
+            }
+            // check if filebuffer contains mouse if keyboard is true
+            else {
+                substr = strstr(fileBuffer, "mouse");
+                if(substr != NULL) {
+                    // if contains mouse set found to false and search again
+                    deviceFound = 0;
                 }
             }
 
-            // free file names
-            for (int i = 0; i < numFiles; i++) {
-                // free name
-                free(namelist[i]);
+            if(!deviceFound) {
+                // free search str
+                free(searchStr);
+                // allocate memory for "Vendor=vendorid Product=productid"
+                searchStr = (char*)calloc(sizeof(char), 25);
+
+                // set searchstr to Vendor=vendorid Product=productid
+                sprintf(searchStr, "Vendor=%s Product=%s", vendorId, productId);
             }
-            // free list
-            free(namelist);
-            
-            // return name if exists
-			if(name) return name;
 
-            // return error
-			errno = ENOMEM;
-			return NULL;
-		}
-	}
+            // get substr from line
+            substr = strstr(fileBuffer, searchStr);
 
-    // free file names
-	for (int i = 0; i < numFiles; i++) {
-		// free name
-        free(namelist[i]);
-	}
-    // free list
-	free(namelist);
+            // if substr exists
+            if(substr != NULL) {
+                // split substr into splitstr
+                char** splitStr;
+                size_t elements = split(substr, ' ', &splitStr);
 
-    errno = ENOENT;
-    return NULL;
+                // get length of string at index 0
+                size_t stringLen = strlen(splitStr[0]);
+                // allocate 11("/dev/input/") + length of string + 1 for null terminator
+                eventStr = (char*)calloc(sizeof(char), stringLen + 12);
+                strcpy(eventStr, "/dev/input/");
 
+                // copy contents of substr.split(' ')[0] to eventstr
+                memcpy(eventStr + 11, splitStr[0], stringLen);
+                // set eventstr at the end to null terminator
+                eventStr[stringLen + 11] = 0;
+
+                // free memory of substrings in splitstr
+                for(int i = 0; i < elements; i++) {
+                    free(splitStr[i]);
+                }
+                // free splitstr
+                free(splitStr);
+                // free filebuffer
+                free(fileBuffer);
+
+                // exit out of loop
+                break;
+            }
+        }
+
+        // free file buffer
+        free(fileBuffer);
+
+        // if end of file break;
+        if(feof(devicesFile)) break;
+        continue;
+    }
+
+    // close file
+    fclose(devicesFile);
+    // free search str
+    free(searchStr);
+
+    return eventStr;
 }
 // end device functions
 
@@ -435,7 +480,7 @@ void mouseUp(int button) {
 
 void* mouseButtonListener(void* threadArgs) {
     // get input path
-    mouseInputPath = find_event(RIVAL600_VID, RIVAL600_PID, 0);
+    mouseInputPath = find_event(RIVAL600_VIDSTR, RIVAL600_PIDSTR, 0);
     // open mouseinputpath
     mouseFD = open(mouseInputPath, O_RDONLY);
     
@@ -459,8 +504,8 @@ void* mouseButtonListener(void* threadArgs) {
             // free mouse input path
             free(mouseInputPath);
             // get mouse input path
-            mouseInputPath = find_event(RIVAL600_VID, RIVAL600_PID, 0);
-            mouseFD = open(mouseInputPath, O_RDONLY);  
+            mouseInputPath = find_event(RIVAL600_VIDSTR, RIVAL600_PIDSTR, 0);
+            mouseFD = open(mouseInputPath, O_RDONLY);
             
             continue;
         }
@@ -494,7 +539,7 @@ void* mouseButtonListener(void* threadArgs) {
 
 void* keyboardKeyListener(void* threadArgs) {
     // get input path
-    keyboardInputPath = find_event(keyboard.VIDPID.vidInt, keyboard.VIDPID.pidInt, 1);
+    keyboardInputPath = find_event(keyboard.VIDPID.vid, keyboard.VIDPID.pid, 1);
     // open input path file
     keyboardFD = open(keyboardInputPath, O_RDONLY);
 
@@ -520,7 +565,7 @@ void* keyboardKeyListener(void* threadArgs) {
             // free keyboard input path
             free(keyboardInputPath);
             // get keyboard input path
-            keyboardInputPath = find_event(keyboard.VIDPID.vidInt, keyboard.VIDPID.pidInt, 1);
+            keyboardInputPath = find_event(keyboard.VIDPID.vid, keyboard.VIDPID.pid, 1);
             // open path as file
             keyboardFD = open(keyboardInputPath, O_RDONLY);  
             

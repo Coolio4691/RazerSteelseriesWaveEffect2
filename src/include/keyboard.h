@@ -18,6 +18,7 @@ void keyboard_init() {
 
     // get keyboard from id
     keyboard_from_id(devices[0], &keyboard);
+    free(devices);
 
     // allocate int array of all keys to pressed keys
     pressedKeys = (int*)malloc((keyboard.lighting.matrix.cols * keyboard.lighting.matrix.rows) * sizeof(int));
