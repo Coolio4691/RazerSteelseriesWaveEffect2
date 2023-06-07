@@ -15,9 +15,6 @@ make
 - [RazerInterface](https://github.com/Coolio4691/RazerInterface)
 - HIDAPI
 
-### Bugs
-Might have a few memory leaks & bugs (which I will try to fix.)
-
 ### Setup
 Requires password.h in src/include with content 
 ```c
